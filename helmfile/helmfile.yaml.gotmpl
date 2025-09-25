@@ -15,30 +15,19 @@ helmDefaults:
 
 releases:
 
-  - name: httpbin
-    needs:
-      - cert-issuer
-      - nginx-ingress
-    namespace: httpbin
-    createNamespace: true
-    chart: baseCharts/app
-    version: 0.17.2
+  ## cert manager for Let's Encrypt
+  - name: cert-manager
+    namespace: cert-manager
+    chart: jetstack/cert-manager
+    version: v1.18.2
     values:
-      - values/httpbin.yaml
-    hooks:
-      - events: ["postsync"]
-        command: "sh"
-        args:
-          - "-c"
-          - |
-            echo "Waiting for deployment to be ready..."
-            kubectl -n httpbin rollout status deployment/httpbin --timeout=300s
-            echo "Deployment successful!"
+      - crds:
+          enabled: true
+        prometheus:
+          enabled: false
 
   ## cert issuer for Let's Encrypt
   - name: cert-issuer
-    needs:
-      - cert-manager
     namespace: default
     chart: baseCharts/default-base
     version: 0.17.2
@@ -59,17 +48,6 @@ releases:
                     ingress:
                       class: nginx
 
-  ## cert manager for Let's Encrypt
-  - name: cert-manager
-    namespace: cert-manager
-    chart: jetstack/cert-manager
-    version: v1.18.2
-    values:
-      - crds:
-          enabled: true
-        prometheus:
-          enabled: false
-
   ## nginx-ingress
   - name: nginx-ingress
     namespace: default
@@ -77,3 +55,19 @@ releases:
     timeout: 360
     version: 4.13.2
 
+  - name: httpbin
+    namespace: httpbin
+    createNamespace: true
+    chart: baseCharts/app
+    version: 0.17.2
+    values:
+      - values/httpbin.yaml
+    hooks:
+      - events: ["postsync"]
+        command: "sh"
+        args:
+          - "-c"
+          - |
+            echo "Waiting for deployment to be ready..."
+            kubectl -n httpbin rollout status deployment/httpbin --timeout=300s
+            echo "Deployment successful!"
