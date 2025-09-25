@@ -1,5 +1,7 @@
 # EKS Deployment Example
 
+**Live Demo: https://httpbin.devbox.buzz/**
+
 A complete infrastructure-as-code example for deploying a Kubernetes application on AWS EKS using Terragrunt, Terraform, and GitHub Actions.
 
 ## Overview
