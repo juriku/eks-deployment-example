@@ -1,0 +1,48 @@
+# Terraform/Terragrunt
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+.terragrunt-cache/
+.terraform.lock.hcl
+terraform.tfvars
+*.auto.tfvars
+
+# Helm
+*.tgz
+charts/*.lock
+.helmignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# AWS
+.aws/
+aws-credentials
+
+# Kubernetes
+kubeconfig
+.kube/
+*kubeconfig*
+
+# Secrets
+*.pem
+*.key
+*secret*
+*password*

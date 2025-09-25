@@ -1,0 +1,145 @@
+name: Deploy Infrastructure and Application
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy AWS Infrastructure
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    container:
+      image: juriku/aws-terragrunt-eks:latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy VPC
+        working-directory: terragrunt/${{ github.event.inputs.environment || 'dev' }}/vpc
+        run: |
+          terragrunt apply --non-interactive
+
+      - name: Deploy EKS Cluster
+        working-directory: terragrunt/${{ github.event.inputs.environment || 'dev' }}/eks
+        run: |
+          terragrunt apply --non-interactive
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
+
+      - name: Verify EKS Cluster
+        run: |
+          kubectl get nodes
+          kubectl get ns
+
+  deploy-application:
+    name: Deploy Application with Helm
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    container:
+      image: juriku/aws-terragrunt-eks:latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
+
+      - name: Deploy with Helmfile and verify
+        working-directory: helmfile
+        run: |
+          helmfile sync
+
+  smoke-tests:
+    name: Run Smoke Tests
+    needs: deploy-application
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    container:
+      image: juriku/aws-terragrunt-eks:latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5.0.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
+      - name: Test HTTPBin Endpoints
+        run: |
+          kubectl -n httpbin get ing httpbin
+          kubectl -n httpbin wait --for=condition=available --timeout=300s deployment/httpbin
+          LB_URL=$(kubectl -n httpbin get ing httpbin -o jsonpath='{.spec.rules[0].host}')
+
+          # Wait for LB to be ready
+          for i in {1..30}; do
+            if curl -s -o /dev/null -w "%{http_code}" http://${LB_URL}/status/200 | grep -q "200"; then
+              echo "LoadBalancer is ready!"
+              break
+            fi
+            echo "Waiting for LoadBalancer to be ready... (attempt $i/30)"
+            sleep 10
+          done
+
+          # Test various endpoints
+          echo "Testing /status/200 endpoint..."
+          curl -f http://${LB_URL}/status/200
+
+          echo "Testing /headers endpoint..."
+          curl -f http://${LB_URL}/headers
+
+          echo "Testing /ip endpoint..."
+          curl -f http://${LB_URL}/ip
+
+          echo "All tests passed successfully!"

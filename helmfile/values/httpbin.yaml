@@ -1,0 +1,88 @@
+# https://github.com/postmanlabs/httpbin/blob/master/Dockerfile
+# https://github.com/juriku/helm-charts/blob/master/charts/app/values.yaml
+
+image:
+  repository: kennethreitz/httpbin
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicas: 2
+
+service:
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+
+ports:
+  - containerPort: 80
+    name: http
+
+resources:
+  limits:
+    memory: 256Mi
+  requests:
+    memory: 256Mi
+
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+  # runAsNonRoot: true
+  # runAsUser: 1000
+  # fsGroup: 1000
+
+# securityContext:
+#   capabilities:
+#     drop:
+#     - ALL
+#   readOnlyRootFilesystem: true
+#   allowPrivilegeEscalation: false
+#   runAsNonRoot: true
+#   runAsUser: 1000
+
+livenessProbe:
+  httpGet:
+    path: /status/200
+    port: 80
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /status/200
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - httpbin
+          topologyKey: kubernetes.io/hostname
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+ingress:
+  enabled: true
+  class: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-http"
+  hosts:
+    - host: httpbin.devbox.buzz
+  tls:
+    - secretName: ssl-httpbin-devbox-buzz
+      hosts:
+        - httpbin.devbox.buzz

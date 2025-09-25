@@ -1,0 +1,78 @@
+repositories:
+  - name: baseCharts
+    url: https://juriku.github.io/helm-charts
+  - name: jetstack
+    url: https://charts.jetstack.io
+  - name: ingress-nginx
+    url: https://kubernetes.github.io/ingress-nginx
+
+helmDefaults:
+  wait: true
+  timeout: 120
+  createNamespace: true
+
+---
+
+releases:
+
+  ## cert manager for Let's Encrypt
+  - name: cert-manager
+    namespace: cert-manager
+    chart: jetstack/cert-manager
+    version: v1.18.2
+    values:
+      - crds:
+          enabled: true
+        prometheus:
+          enabled: false
+
+  ## cert issuer for Let's Encrypt
+  - name: cert-issuer
+    needs:
+      - cert-manager
+    namespace: default
+    chart: baseCharts/default-base
+    version: 0.17.2
+    values:
+      - rawYamlList:
+          - apiVersion: cert-manager.io/v1
+            kind: ClusterIssuer
+            metadata:
+              name: letsencrypt-http
+            spec:
+              acme:
+                email: juri.sinar+httpbin@gmail.com
+                privateKeySecretRef:
+                  name: letsencrypt-http
+                server: https://acme-v02.api.letsencrypt.org/directory
+                solvers:
+                - http01:
+                    ingress:
+                      class: nginx
+
+  ## nginx-ingress
+  - name: nginx-ingress
+    namespace: default
+    chart: ingress-nginx/ingress-nginx
+    timeout: 360
+    version: 4.13.2
+
+  - name: httpbin
+    needs:
+      - cert-issuer
+      - nginx-ingress
+    namespace: httpbin
+    createNamespace: true
+    chart: baseCharts/app
+    version: 0.17.2
+    values:
+      - values/httpbin.yaml
+    hooks:
+      - events: ["postsync"]
+        command: "sh"
+        args:
+          - "-c"
+          - |
+            echo "Waiting for deployment to be ready..."
+            kubectl -n httpbin rollout status deployment/httpbin --timeout=300s
+            echo "Deployment successful!"
