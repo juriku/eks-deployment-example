@@ -15,19 +15,10 @@ helmDefaults:
 
 releases:
 
-  ## cert manager for Let's Encrypt
-  - name: cert-manager
-    namespace: cert-manager
-    chart: jetstack/cert-manager
-    version: v1.18.2
-    values:
-      - crds:
-          enabled: true
-        prometheus:
-          enabled: false
-
   ## cert issuer for Let's Encrypt
   - name: cert-issuer
+    needs:
+      - cert-manager
     namespace: default
     chart: baseCharts/default-base
     version: 0.17.2
@@ -47,6 +38,17 @@ releases:
                 - http01:
                     ingress:
                       class: nginx
+
+  ## cert manager for Let's Encrypt
+  - name: cert-manager
+    namespace: cert-manager
+    chart: jetstack/cert-manager
+    version: v1.18.2
+    values:
+      - crds:
+          enabled: true
+        prometheus:
+          enabled: false
 
   ## nginx-ingress
   - name: nginx-ingress
