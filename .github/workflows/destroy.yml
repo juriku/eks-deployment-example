@@ -17,7 +17,7 @@ on:
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
   AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  CLUSTER_NAME: ${{ secrets.CLUSTER_NAME }}
+  CLUSTER_NAME: ${{ vars.CLUSTER_NAME || 'httpbin-eks' }}
 
 jobs:
   destroy-infrastructure:
@@ -45,9 +45,9 @@ jobs:
       - name: Destroy EKS Cluster
         working-directory: terragrunt/${{ github.event.inputs.environment || 'dev' }}/eks
         run: |
-          terragrunt destroy --non-interactive
+          terragrunt destroy --non-interactive --auto-approve
 
       - name: Destroy VPC
         working-directory: terragrunt/${{ github.event.inputs.environment || 'dev' }}/vpc
         run: |
-          terragrunt destroy  --non-interactive
+          terragrunt destroy --non-interactive --auto-approve
