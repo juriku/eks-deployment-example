@@ -44,12 +44,12 @@ jobs:
       - name: Deploy VPC
         working-directory: terragrunt/${{ github.event.inputs.environment || 'dev' }}/vpc
         run: |
-          terragrunt apply --non-interactive
+          terragrunt apply --non-interactive --auto-approve
 
       - name: Deploy EKS Cluster
         working-directory: terragrunt/${{ github.event.inputs.environment || 'dev' }}/eks
         run: |
-          terragrunt apply --non-interactive
+          terragrunt apply --non-interactive --auto-approve
 
       - name: Update kubeconfig
         run: |

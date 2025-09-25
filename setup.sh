@@ -13,10 +13,10 @@ fi
 
 # Deploy OIDC and role
 cd terragrunt/dev/github-oidc
-terragrunt apply -auto-approve
+terragrunt apply --non-interactive --auto-approve
 
 cd ../github-role
-terragrunt apply -auto-approve
+terragrunt apply --non-interactive --auto-approve
 
 # Output role ARN for github secret
 echo "AWS_ROLE_ARN=$(terragrunt output -raw github_actions_role_arn)"
