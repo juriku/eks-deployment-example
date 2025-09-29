@@ -9,6 +9,7 @@ services:
       - AWS_REGION
       - GITHUB_ORG
       - GITHUB_REPO
+      - CLUSTER_NAME
     volumes:
       - ~/.aws:/root/.aws:ro
       - .:/workspace
